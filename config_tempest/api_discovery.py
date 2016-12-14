@@ -206,3 +206,5 @@ def discover(auth_provider, region, object_store_discovery=True,
             services[name]['extensions'] = service.get_extensions()
         services[name]['versions'] = service.get_versions()
     return services
+
+
