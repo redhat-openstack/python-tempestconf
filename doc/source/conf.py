@@ -37,7 +37,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'tempest_config_tool'
+project = u'python-tempestconf'
 copyright = u'2016, OpenStack Foundation'
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
