@@ -101,7 +101,7 @@ class TestClientManager(BaseConfigTempestTest):
         mock_function = mock.Mock(return_value={"id": "my_fake_id"})
         func2mock = 'config_tempest.config_tempest.identity.get_tenant_by_name'
         self.useFixture(MonkeyPatch(func2mock, mock_function))
-        tool.ClientManager(self.conf, admin=True)
+        self._get_clients(self.conf, admin=True)
         # check if admin credentials were set
         admin_tenant = self.conf.get("identity", "admin_tenant_name")
         admin_password = self.conf.get("identity", "admin_password")
