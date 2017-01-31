@@ -38,9 +38,11 @@ import ConfigParser
 import logging
 import os
 import shutil
+import sys
 import tempest.config
 import urllib2
 
+import os_client_config
 from tempest.common import identity
 from tempest.lib import auth
 from tempest.lib import exceptions
@@ -130,7 +132,10 @@ def main():
                 conf.set(section, key, value, priority=True)
     for section, key, value in args.overrides:
         conf.set(section, key, value, priority=True)
-    uri = conf.get("identity", "uri")
+    if conf.has_option('uri', 'identity'):
+        uri = conf.get("identity", "uri")
+    else:
+        uri = args.config['auth'].get('auth_url')
     api_version = 2
     v3_only = False
     if "v3" in uri and v3_only:
@@ -183,7 +188,9 @@ def main():
 
 def parse_arguments():
     # TODO(tkammer): add mutual exclusion groups
+    cloud_config = os_client_config.OpenStackConfig()
     parser = argparse.ArgumentParser(__doc__)
+    cloud_config.register_argparse_arguments(parser, sys.argv)
     parser.add_argument('--create', action='store_true', default=False,
                         help='create default tempest resources')
     parser.add_argument('--out', default="etc/tempest.conf",
@@ -223,13 +230,13 @@ def parse_arguments():
                                 instance with external connectivity""")
 
     args = parser.parse_args()
-
     if args.create and args.non_admin:
         raise Exception("Options '--create' and '--non-admin' cannot be used"
                         " together, since creating" " resources requires"
                         " admin rights")
     args.overrides = parse_overrides(args.overrides)
-    return args
+    cloud = cloud_config.get_one_cloud(argparse=args)
+    return cloud
 
 
 def parse_overrides(overrides):
