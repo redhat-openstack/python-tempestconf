@@ -62,3 +62,20 @@ After this, `./etc/tempest.conf` is generated.
  [here](https://www.rdoproject.org/blog/2017/02/testing-rdo-with-tempest-new-features-in-ocata/)
 
 
+### os-client-config support
+
+python-tempestconf supports [os-client-config](https://github.com/openstack/os-client-config)
+so instead of sourcing openstackrc files you can use clouds.yml files. Location where
+these files should be stored and syntax which is used to specify cloud.yaml files
+can be found [here](https://github.com/openstack/os-client-config#config-files)
+
+In case of git usage:
+
+    (py27) $ python config_tempest/config_tempest.py --debug --create --os-cloud <name of cloud>
+
+In case of RPM:
+
+    $ tempest init testingdir
+    $ cd testingdir
+    $ discover-tempest-config --debug --create --os-cloud <name of cloud>
+
