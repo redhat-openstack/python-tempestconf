@@ -1,0 +1,9 @@
+Verified+1: Daniel Mellado <dmellado@redhat.com>
+Code-Review+1: Sagi (Sergey) Shnaidman <sshnaidm@redhat.com>
+Code-Review+2: Arx Cruz <arxcruz@redhat.com>
+Code-Review+2: Daniel Mellado <dmellado@redhat.com>
+Submitted-by: Daniel Mellado <dmellado@redhat.com>
+Submitted-at: Wed, 15 Feb 2017 07:39:16 -0500
+Reviewed-on: https://review.gerrithub.io/348739
+Project: redhat-openstack/python-tempestconf
+Branch: refs/heads/master
