@@ -21,6 +21,7 @@ from config_tempest.tests import base
 from fixtures import MonkeyPatch
 import logging
 from mock import Mock
+import mock
 
 # disable logging when running unit tests
 logging.disable(logging.CRITICAL)
@@ -313,3 +314,111 @@ class TestFindImage(base.TestCase):
         self._mock_list_images(return_value={"images": self.IMAGES_LIST},
                                image_name="DoesNotExist",
                                expected_resp=None)
+
+
+class TestFindOrUploadImage(base.TestCase):
+
+    def setUp(self):
+        super(TestFindOrUploadImage, self).setUp()
+        conf = _get_conf("v2.0", "v3")
+        self.client = _get_clients(conf).images
+
+    @mock.patch('config_tempest.config_tempest._find_image')
+    def test_find_or_upload_image_not_found_creation_not_allowed(
+            self, mock_find_image):
+        mock_find_image.return_value = None
+        exc = Exception
+        self.assertRaises(exc, tool.find_or_upload_image, client=self.client,
+                          image_id=None, image_name=None,
+                          allow_creation=False)
+
+    @mock.patch('config_tempest.config_tempest._find_image')
+    @mock.patch('config_tempest.config_tempest._download_file')
+    @mock.patch('config_tempest.config_tempest._upload_image')
+    def test_find_or_upload_image_not_found_creation_allowed_http(
+            self, mock_upload_image, mock_download_file, mock_find_image):
+        mock_find_image.return_value = None
+        mock_upload_image.return_value = {"id": "my_fake_id"}
+        image_source = "http://any_random_url"
+        image_dest = "my_dest"
+        image_name = "my_image"
+        disk_format = "my_format"
+        image_id = tool.find_or_upload_image(
+            client=self.client, image_id=None, image_dest=image_dest,
+            image_name=image_name, image_source=image_source,
+            allow_creation=True, disk_format=disk_format)
+        mock_download_file.assert_called_with(image_source, image_dest)
+        mock_upload_image.assert_called_with(self.client,
+                                             image_name, image_dest,
+                                             disk_format)
+        self.assertEquals(image_id, "my_fake_id")
+
+    @mock.patch('config_tempest.config_tempest._find_image')
+    @mock.patch('config_tempest.config_tempest._download_file')
+    @mock.patch('config_tempest.config_tempest._upload_image')
+    def test_find_or_upload_image_not_found_creation_allowed_https(
+            self, mock_upload_image, mock_download_file, mock_find_image):
+        mock_find_image.return_value = None
+        mock_upload_image.return_value = {"id": "my_fake_id"}
+        image_source = "https://any_random_url"
+        image_dest = "my_dest"
+        image_name = "my_image"
+        disk_format = "my_format"
+        image_id = tool.find_or_upload_image(
+            client=self.client, image_id=None, image_dest=image_dest,
+            image_name=image_name, image_source=image_source,
+            allow_creation=True, disk_format=disk_format)
+        mock_download_file.assert_called_with(image_source, image_dest)
+        mock_upload_image.assert_called_with(self.client, image_name,
+                                             image_dest, disk_format)
+        self.assertEquals(image_id, "my_fake_id")
+
+    @mock.patch('shutil.copyfile')
+    @mock.patch('config_tempest.config_tempest._find_image')
+    @mock.patch('config_tempest.config_tempest._download_file')
+    @mock.patch('config_tempest.config_tempest._upload_image')
+    def test_find_or_upload_image_not_found_creation_allowed_ftp(
+            self, mock_upload_image, mock_download_file, mock_find_image,
+            mock_copy):
+        mock_find_image.return_value = None
+        mock_upload_image.return_value = {"id": "my_fake_id"}
+        # image source does not start with http or https
+        image_source = "ftp://any_random_url"
+        image_dest = "place_on_disk"
+        disk_format = "my_format"
+        image_name = "my_image"
+        image_id = tool.find_or_upload_image(
+            client=self.client, image_id=None, image_name=image_name,
+            image_source=image_source, image_dest=image_dest,
+            allow_creation=True, disk_format=disk_format)
+        mock_copy.assert_called_with(image_source, image_dest)
+        mock_upload_image.assert_called_with(
+            self.client, image_name, image_dest, disk_format)
+        self.assertEquals(image_id, "my_fake_id")
+
+    @mock.patch('os.path.isfile')
+    @mock.patch('config_tempest.config_tempest._find_image')
+    def test_find_or_upload_image_found_downloaded(
+            self, mock_find_image, mock_isfile):
+        mock_find_image.return_value = \
+            {"status": "active", "name": "ImageName", "id": "my_fake_id"}
+        mock_isfile.return_value = True
+        image_id = tool.find_or_upload_image(
+            client=self.client, image_id=None,
+            image_name=None, allow_creation=True)
+        self.assertEquals(image_id, "my_fake_id")
+
+    @mock.patch('config_tempest.config_tempest._download_image')
+    @mock.patch('os.path.isfile')
+    @mock.patch('config_tempest.config_tempest._find_image')
+    def test_find_or_upload_image_found_not_downloaded(
+            self, mock_find_image, mock_isfile, mock_download_image):
+        image_id = "my_fake_id"
+        mock_find_image.return_value = \
+            {"status": "active", "name": "ImageName", "id": image_id}
+        mock_isfile.return_value = False
+        image_id = tool.find_or_upload_image(
+            client=self.client, image_id=None,
+            image_name=None, allow_creation=True)
+        mock_download_image.assert_called()
+        self.assertEquals(image_id, "my_fake_id")
