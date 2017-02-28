@@ -21,6 +21,7 @@ from config_tempest.tests import base
 from fixtures import MonkeyPatch
 import logging
 import mock
+from tempest.lib import exceptions
 
 # disable logging when running unit tests
 logging.disable(logging.CRITICAL)
@@ -615,3 +616,524 @@ class TestCreateTempestNetworks(base.TestCase):
                                      public_network_id=None)
         self.assertEqual(self.conf.get('compute', 'fixed_network_name'),
                          'my_fake_label')
+
+
+class TestCreateTempestImages(base.TestCase):
+
+    def setUp(self):
+        super(TestCreateTempestImages, self).setUp()
+        self.conf = _get_conf("v2.0", "v3")
+        self.client = _get_clients(self.conf).images
+
+    @mock.patch('config_tempest.config_tempest.find_or_upload_image')
+    def test_create_tempest_images_exception(self, mock_find_upload):
+        mock_find_upload.side_effect = Exception
+        exc = Exception
+        image_path = "my_path"
+        allow_creation = False
+        disk_format = ".format"
+        dir = "/img/"
+        self.conf.set("scenario", "img_dir", dir)
+        self.assertRaises(exc,
+                          tool.create_tempest_images,
+                          client=self.client,
+                          conf=self.conf,
+                          image_path=image_path,
+                          allow_creation=allow_creation,
+                          disk_format=disk_format)
+
+    @mock.patch('config_tempest.config_tempest.find_or_upload_image')
+    def test_create_tempest_images_ref_alt_ref(self,
+                                               mock_find_upload):
+        self.conf.set('compute', 'image_ref', 'id_a')
+        self.conf.set('compute', 'image_ref_alt', 'id_b')
+        mock_find_upload.side_effect = ["id_c", "id_d"]
+        image_path = "my_path"
+        allow_creation = True
+        disk_format = ".format"
+        dir = "/img/"
+        self.conf.set("scenario", "img_dir", dir)
+        tool.create_tempest_images(client=self.client,
+                                   conf=self.conf,
+                                   image_path=image_path,
+                                   allow_creation=allow_creation,
+                                   disk_format=disk_format)
+        self.assertEqual(self.conf.get('compute', 'image_ref'), 'id_c')
+        self.assertEqual(self.conf.get('compute', 'image_ref_alt'), 'id_d')
+
+    @mock.patch('config_tempest.config_tempest.find_or_upload_image')
+    def test_create_tempest_images_ref_no_alt_ref(self,
+                                                  mock_find_upload):
+        self.conf.set('compute', 'image_ref', 'id_a')
+        mock_find_upload.side_effect = ["id_c", "id_d"]
+        image_path = "my_path"
+        allow_creation = True
+        disk_format = ".format"
+        dir = "/img/"
+        self.conf.set("scenario", "img_dir", dir)
+        tool.create_tempest_images(client=self.client,
+                                   conf=self.conf,
+                                   image_path=image_path,
+                                   allow_creation=allow_creation,
+                                   disk_format=disk_format)
+        self.assertEqual(self.conf.get('compute', 'image_ref'), 'id_c')
+        self.assertEqual(self.conf.get('compute', 'image_ref_alt'), 'id_d')
+
+    @mock.patch('config_tempest.config_tempest.find_or_upload_image')
+    def test_create_tempest_images_no_ref_alt_ref(self, mock_find_upload):
+        self.conf.set('compute', 'image_ref_alt', 'id_b')
+        mock_find_upload.side_effect = ["id_c", "id_d"]
+        image_path = "my_path"
+        allow_creation = True
+        disk_format = ".format"
+        dir = "/img/"
+        self.conf.set("scenario", "img_dir", dir)
+        tool.create_tempest_images(client=self.client,
+                                   conf=self.conf,
+                                   image_path=image_path,
+                                   allow_creation=allow_creation,
+                                   disk_format=disk_format)
+        self.assertEqual(self.conf.get('compute', 'image_ref'), 'id_c')
+        self.assertEqual(self.conf.get('compute', 'image_ref_alt'), 'id_d')
+
+    @mock.patch('config_tempest.config_tempest.find_or_upload_image')
+    def test_create_tempest_images_no_ref_no_alt_ref(self, mock_find_upload):
+        mock_find_upload.side_effect = ["id_c", "id_d"]
+        image_path = "my_path"
+        allow_creation = True
+        disk_format = ".format"
+        dir = "/img/"
+        self.conf.set("scenario", "img_dir", dir)
+        tool.create_tempest_images(client=self.client,
+                                   conf=self.conf,
+                                   image_path=image_path,
+                                   allow_creation=allow_creation,
+                                   disk_format=disk_format)
+        self.assertEqual(self.conf.get('compute', 'image_ref'), 'id_c')
+        self.assertEqual(self.conf.get('compute', 'image_ref_alt'), 'id_d')
+
+
+class TestCreateUserWithTenant(base.TestCase):
+
+    def setUp(self):
+        super(TestCreateUserWithTenant, self).setUp()
+        self.conf = _get_conf("v2.0", "v3")
+        self.tenants_client = _get_clients(self.conf).tenants
+        self.users_client = _get_clients(self.conf).users
+
+    @mock.patch('tempest.common.identity.get_tenant_by_name')
+    @mock.patch('tempest.lib.services.identity.v2.tenants_client.'
+                'TenantsClient.create_tenant')
+    @mock.patch('tempest.lib.services.identity.v2.users_client.'
+                'UsersClient.create_user')
+    def test_create_user_with_tenant(self,
+                                     mock_create_user,
+                                     mock_create_tenant,
+                                     mock_get_tenant_by_name):
+        username = "test_user"
+        password = "cryptic"
+        tenant_name = "project"
+        mock_get_tenant_by_name.return_value = {'id': "fake-id"}
+        tenant_description = "Tenant for Tempest %s user" % username
+        email = "%s@test.com" % username
+        tool.create_user_with_tenant(
+            tenants_client=self.tenants_client,
+            users_client=self.users_client,
+            username=username,
+            password=password,
+            tenant_name=tenant_name)
+        mock_create_tenant.assert_called_with(
+            name=tenant_name, description=tenant_description)
+        mock_create_user.assert_called_with(name=username,
+                                            password=password,
+                                            tenantId="fake-id",
+                                            email=email)
+
+    @mock.patch('tempest.common.identity.get_tenant_by_name')
+    @mock.patch(
+        'tempest.lib.services.identity.v2.'
+        'tenants_client.TenantsClient.create_tenant')
+    @mock.patch('tempest.lib.services.identity.v2'
+                '.users_client.UsersClient.create_user')
+    def test_create_user_with_tenant_tenant_exists(
+            self,
+            mock_create_user,
+            mock_create_tenant,
+            mock_get_tenant_by_name):
+        username = "test_user"
+        password = "cryptic"
+        tenant_name = "project"
+        mock_get_tenant_by_name.return_value = {'id': "fake-id"}
+        tenant_description = "Tenant for Tempest %s user" % username
+        email = "%s@test.com" % username
+        exc = exceptions.Conflict
+        mock_create_tenant.side_effect = exc
+        tool.create_user_with_tenant(
+            tenants_client=self.tenants_client,
+            users_client=self.users_client,
+            username=username,
+            password=password,
+            tenant_name=tenant_name)
+        mock_create_tenant.assert_called_with(
+            name=tenant_name, description=tenant_description)
+        mock_create_user.assert_called_with(
+            name=username,
+            password=password,
+            tenantId="fake-id",
+            email=email)
+
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.update_user_password')
+    @mock.patch('tempest.common.identity.get_user_by_username')
+    @mock.patch('tempest.common.identity.get_tenant_by_name')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'tenants_client.TenantsClient.create_tenant')
+    @mock.patch('tempest.lib.services.identity.'
+                'v2.users_client.UsersClient.create_user')
+    def test_create_user_with_tenant_user_exists(
+            self, mock_create_user, mock_create_tenant,
+            mock_get_tenant_by_name,
+            mock_get_user_by_username,
+            mock_update_user_password):
+        username = "test_user"
+        password = "cryptic"
+        tenant_name = "project"
+        mock_get_tenant_by_name.return_value = {'id': "fake-id"}
+        tenant_description = "Tenant for Tempest %s user" % username
+        email = "%s@test.com" % username
+        exc = exceptions.Conflict
+        mock_create_user.side_effect = exc
+        fake_user = {'id': "fake_user_id"}
+        mock_get_user_by_username.return_value = fake_user
+        tool.create_user_with_tenant(
+            tenants_client=self.tenants_client,
+            users_client=self.users_client,
+            username=username, password=password,
+            tenant_name=tenant_name)
+        mock_create_tenant.assert_called_with(
+            name=tenant_name, description=tenant_description)
+        mock_create_user.assert_called_with(name=username,
+                                            password=password,
+                                            tenantId="fake-id",
+                                            email=email)
+        mock_update_user_password.assert_called_with(
+            fake_user['id'], password=password)
+
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.update_user_password')
+    @mock.patch('tempest.common.identity.get_user_by_username')
+    @mock.patch('tempest.common.identity.get_tenant_by_name')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'tenants_client.TenantsClient.create_tenant')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.create_user')
+    def test_create_user_with_tenant_exists_user_exists(
+            self, mock_create_user, mock_create_tenant,
+            mock_get_tenant_by_name,
+            mock_get_user_by_username,
+            mock_update_user_password):
+        username = "test_user"
+        password = "cryptic"
+        tenant_name = "project"
+        mock_get_tenant_by_name.return_value = {'id': "fake-id"}
+        tenant_description = "Tenant for Tempest %s user" % username
+        email = "%s@test.com" % username
+        exc = exceptions.Conflict
+        mock_create_tenant.side_effects = exc
+        mock_create_user.side_effect = exc
+        fake_user = {'id': "fake_user_id"}
+        mock_get_user_by_username.return_value = fake_user
+        tool.create_user_with_tenant(tenants_client=self.tenants_client,
+                                     users_client=self.users_client,
+                                     username=username,
+                                     password=password,
+                                     tenant_name=tenant_name)
+        mock_create_tenant.assert_called_with(
+            name=tenant_name, description=tenant_description)
+        mock_create_user.assert_called_with(name=username,
+                                            password=password,
+                                            tenantId="fake-id",
+                                            email=email)
+        mock_update_user_password.assert_called_with(
+            fake_user['id'], password=password)
+
+
+class TestGiveRoleToUser(base.TestCase):
+
+    def setUp(self):
+        super(TestGiveRoleToUser, self).setUp()
+        self.conf = _get_conf("v2.0", "v3")
+        self.tenants_client = _get_clients(self.conf).tenants
+        self.users_client = _get_clients(self.conf).users
+        self.roles_client = _get_clients(self.conf).roles
+
+    @mock.patch('tempest.common.identity.get_tenant_by_name')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.list_users')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.create_user')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'roles_client.RolesClient.list_roles')
+    @mock.patch('tempest.lib.services.identity.v2.''roles_client.'
+                'RolesClient.create_user_role_on_project')
+    def test_give_role_to_user(self,
+                               mock_create_user_role_on_project,
+                               mock_list_roles,
+                               mock_create_user,
+                               mock_list_users,
+                               mock_get_tenant_by_name):
+        username = "test_user"
+        tenant_name = "project"
+        role_name = "fake_role"
+        users = {
+            'users': [{'name': "test_user", 'id': "fake_user_id"},
+                      {'name': "test_user2", 'id': "fake_user_id2"}
+                      ]
+
+        }
+        roles = {
+            'roles': [{'name': "fake_role", 'id': "fake_role_id"},
+                      {'name': "fake_role2", 'id': "fake_role_id2"}
+                      ]
+        }
+
+        mock_get_tenant_by_name.return_value = \
+            {'id': "fake_tenant_id"}
+        mock_list_users.return_value = users
+        mock_list_roles.return_value = roles
+        tool.give_role_to_user(
+            tenants_client=self.tenants_client,
+            roles_client=self.roles_client,
+            users_client=self.users_client,
+            username=username,
+            tenant_name=tenant_name,
+            role_name=role_name)
+        mock_create_user_role_on_project.assert_called_with(
+            "fake_tenant_id", "fake_user_id", "fake_role_id")
+
+    @mock.patch('tempest.common.identity.get_tenant_by_name')
+    @mock.patch('tempest.lib.services.identity.'
+                'v2.users_client.UsersClient.list_users')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.create_user')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'roles_client.RolesClient.list_roles')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'roles_client.RolesClient.create_user_role_on_project')
+    def test_give_role_to_user_role_not_found(
+            self,
+            mock_create_user_role_on_project,
+            mock_list_roles,
+            mock_create_user,
+            mock_list_users,
+            mock_get_tenant_by_name):
+
+        username = "test_user"
+        tenant_name = "project"
+        role_name = "fake_role_that_does_not_exist"
+        users = {
+            'users': [{'name': "test_user", 'id': "fake_user_id"},
+                      {'name': "test_user2", 'id': "fake_user_id2"}
+                      ]
+
+        }
+        roles = {
+            'roles': [{'name': "fake_role", 'id': "fake_role_id"},
+                      {'name': "fake_role2", 'id': "fake_role_id2"}
+                      ]
+        }
+
+        mock_get_tenant_by_name.return_value = \
+            {'id': "fake_tenant_id"}
+        mock_list_users.return_value = users
+        mock_list_roles.return_value = roles
+        exc = Exception
+        self.assertRaises(exc,
+                          tool.give_role_to_user,
+                          tenants_client=self.tenants_client,
+                          roles_client=self.roles_client,
+                          users_client=self.users_client,
+                          username=username,
+                          tenant_name=tenant_name,
+                          role_name=role_name)
+
+    @mock.patch('tempest.common.identity.get_tenant_by_name')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.list_users')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.create_user')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'roles_client.RolesClient.list_roles')
+    @mock.patch('tempest.lib.services.identity.v2.roles_client'
+                '.RolesClient.create_user_role_on_project')
+    def test_give_role_to_user_role_not_found_not_req(
+            self,
+            mock_create_user_role_on_project,
+            mock_list_roles,
+            mock_create_user,
+            mock_list_users,
+            mock_get_tenant_by_name):
+
+        username = "test_user"
+        tenant_name = "project"
+        role_name = "fake_role_that_does_not_exist"
+        users = {
+            'users': [{'name': "test_user", 'id': "fake_user_id"},
+                      {'name': "test_user2", 'id': "fake_user_id2"}
+                      ]
+
+        }
+        roles = {
+            'roles': [{'name': "fake_role", 'id': "fake_role_id"},
+                      {'name': "fake_role2", 'id': "fake_role_id2"}
+                      ]
+        }
+
+        mock_get_tenant_by_name.return_value = \
+            {'id': "fake_tenant_id"}
+        mock_list_users.return_value = users
+        mock_list_roles.return_value = roles
+        tool.give_role_to_user(
+            tenants_client=self.tenants_client,
+            roles_client=self.roles_client,
+            users_client=self.users_client,
+            username=username,
+            tenant_name=tenant_name,
+            role_name=role_name,
+            role_required=False)
+
+    @mock.patch('tempest.common.identity.get_tenant_by_name')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.list_users')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'users_client.UsersClient.create_user')
+    @mock.patch('tempest.lib.services.identity.v2.'
+                'roles_client.RolesClient.list_roles')
+    @mock.patch('tempest.lib.services.identity.v2.roles_client.'
+                'RolesClient.create_user_role_on_project')
+    def test_give_role_to_user_role_already_given(
+            self,
+            mock_create_user_role_on_project,
+            mock_list_roles,
+            mock_create_user,
+            mock_list_users,
+            mock_get_tenant_by_name):
+        exc = exceptions.Conflict
+        mock_create_user_role_on_project.side_effect = exc
+        username = "test_user"
+        tenant_name = "project"
+        role_name = "fake_role"
+        users = {
+            'users': [{'name': "test_user", 'id': "fake_user_id"},
+                      {'name': "test_user2", 'id': "fake_user_id2"}
+                      ]
+
+        }
+        roles = {
+            'roles': [{'name': "fake_role", 'id': "fake_role_id"},
+                      {'name': "fake_role2", 'id': "fake_role_id2"}
+                      ]
+        }
+
+        mock_get_tenant_by_name.return_value = {'id': "fake_tenant_id"}
+        mock_list_users.return_value = users
+        mock_list_roles.return_value = roles
+        tool.give_role_to_user(
+            tenants_client=self.tenants_client,
+            roles_client=self.roles_client,
+            users_client=self.users_client,
+            username=username,
+            tenant_name=tenant_name,
+            role_name=role_name)
+
+
+class TestCreateTempestUser(base.TestCase):
+
+    def setUp(self):
+        super(TestCreateTempestUser, self).setUp()
+        self.conf = _get_conf("v2.0", "v3")
+        self.tenants_client = _get_clients(self.conf).tenants
+        self.users_client = _get_clients(self.conf).users
+        self.roles_client = _get_clients(self.conf).roles
+
+    @mock.patch('config_tempest.config_tempest.'
+                'create_user_with_tenant')
+    @mock.patch('config_tempest.config_tempest.give_role_to_user')
+    def test_create_tempest_user(self,
+                                 mock_give_role_to_user,
+                                 mock_create_user_with_tenant):
+        alt_username = "my_user"
+        alt_password = "my_pass"
+        alt_tenant_name = "my_tenant"
+        self.conf.set("identity", "alt_username", alt_username)
+        self.conf.set("identity", "alt_password", alt_password)
+        self.conf.set("identity", "alt_tenant_name", alt_tenant_name)
+        tool.create_tempest_users(self.tenants_client,
+                                  self.roles_client,
+                                  self.users_client,
+                                  self.conf,
+                                  services=['compute', 'network'])
+        mock_give_role_to_user.assert_called_with(
+            self.tenants_client, self.roles_client,
+            self.users_client,
+            self.conf.get('identity', 'admin_username'),
+            self.conf.get('identity', 'tenant_name'),
+            role_name='admin')
+        self.assertEqual(mock_create_user_with_tenant.mock_calls, [
+            mock.call(self.tenants_client,
+                      self.users_client,
+                      self.conf.get('identity', 'username'),
+                      self.conf.get('identity', 'password'),
+                      self.conf.get('identity', 'tenant_name')),
+            mock.call(self.tenants_client,
+                      self.users_client,
+                      self.conf.get('identity', 'alt_username'),
+                      self.conf.get('identity', 'alt_password'),
+                      self.conf.get('identity', 'alt_tenant_name')),
+        ])
+
+    @mock.patch('config_tempest.config_tempest.'
+                'create_user_with_tenant')
+    @mock.patch('config_tempest.config_tempest.give_role_to_user')
+    def test_create_tempest_user_with_orchestration(
+            self,
+            mock_give_role_to_user,
+            mock_create_user_with_tenant):
+        alt_username = "my_user"
+        alt_password = "my_pass"
+        alt_tenant_name = "my_tenant"
+        self.conf.set("identity", "alt_username", alt_username)
+        self.conf.set("identity", "alt_password", alt_password)
+        self.conf.set("identity", "alt_tenant_name", alt_tenant_name)
+        tool.create_tempest_users(
+            self.tenants_client, self.roles_client,
+            self.users_client,
+            self.conf,
+            services=['compute', 'network', 'orchestration'])
+        self.assertEqual(mock_give_role_to_user.mock_calls, [
+            mock.call(self.tenants_client,
+                      self.roles_client,
+                      self.users_client,
+                      self.conf.get('identity', 'admin_username'),
+                      self.conf.get('identity', 'tenant_name'),
+                      role_name='admin'),
+            mock.call(self.tenants_client,
+                      self.roles_client,
+                      self.users_client,
+                      self.conf.get('identity', 'username'),
+                      self.conf.get('identity', 'tenant_name'),
+                      role_name='heat_stack_owner',
+                      role_required=False),
+        ])
+        self.assertEqual(mock_create_user_with_tenant.mock_calls, [
+            mock.call(self.tenants_client,
+                      self.users_client,
+                      self.conf.get('identity', 'username'),
+                      self.conf.get('identity', 'password'),
+                      self.conf.get('identity', 'tenant_name')),
+            mock.call(self.tenants_client,
+                      self.users_client,
+                      self.conf.get('identity', 'alt_username'),
+                      self.conf.get('identity', 'alt_password'),
+                      self.conf.get('identity', 'alt_tenant_name')),
+        ])
