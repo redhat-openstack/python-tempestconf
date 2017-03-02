@@ -1,0 +1,11 @@
+Verified+1: Daniel Mellado <dmellado@redhat.com>
+Verified+1: <mkopec+jenkins@redhat.com>
+Code-Review+1: Martin Kopec <mkopec@redhat.com>
+Code-Review+2: Daniel Mellado <dmellado@redhat.com>
+Code-Review+2: Chandan Kumar <chkumar@redhat.com>
+Verified+1: Chandan Kumar <chkumar@redhat.com>
+Submitted-by: Chandan Kumar <chkumar@redhat.com>
+Submitted-at: Thu, 02 Mar 2017 03:42:24 -0500
+Reviewed-on: https://review.gerrithub.io/349194
+Project: redhat-openstack/python-tempestconf
+Branch: refs/heads/master
