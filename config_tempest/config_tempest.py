@@ -38,6 +38,7 @@ import ConfigParser
 import logging
 import os
 import shutil
+import sys
 import tempest.config
 import urllib2
 
@@ -176,6 +177,11 @@ def main():
     configure_discovered_services(conf, services)
     configure_boto(conf, services)
     configure_horizon(conf)
+
+    # remove all unwanted values if were specified
+    if args.remove != {}:
+        LOG.info("Removing configuration: %s", str(args.remove))
+        conf.remove_values(args)
     LOG.info("Creating configuration file %s", os.path.abspath(args.out))
     with open(args.out, 'w') as f:
         conf.write(f)
@@ -221,6 +227,12 @@ def parse_arguments():
     parser.add_argument('--network-id',
                         help="""The ID of an existing network in our openstack
                                 instance with external connectivity""")
+    parser.add_argument('--remove', nargs='*', default=[],
+                        help="""key values pairs to be removed from
+                                configuration file.
+                                For example: identity.username myname
+                                 identity-feature-enabled.api_extensions
+                                   http https""")
 
     args = parser.parse_args()
 
@@ -229,7 +241,29 @@ def parse_arguments():
                         " together, since creating" " resources requires"
                         " admin rights")
     args.overrides = parse_overrides(args.overrides)
+    args.remove = parse_values_to_remove(args.remove)
     return args
+
+
+def parse_values_to_remove(options):
+    """Manual parsing of remove arguments.
+
+    :options list of arguments following --remove argument
+    :returns dict containing key paths with values to be removed
+    EXAMPLE: {'identity.username': [myname],
+              'identity-feature-enabled.api_extensions': [http, https]}
+    """
+    parsed = {}
+    lastSection = ""
+    for argument in options:
+        if '.' in argument:
+            # section path
+            lastSection = argument
+            parsed[lastSection] = []
+        else:
+            # value
+            parsed[lastSection].append(argument)
+    return parsed
 
 
 def parse_overrides(overrides):
@@ -463,6 +497,34 @@ class TempestConf(ConfigParser.SafeConfigParser):
         LOG.debug("Setting [%s] %s = %s", section, key, value)
         ConfigParser.SafeConfigParser.set(self, section, key, value)
         return True
+
+    def remove_values(self, args):
+        """Remove values from configuration file specified in arguments.
+
+        :args - arguments object
+        """
+        for key_path in args.remove:
+            section, key = key_path.split('.')
+            try:
+                conf_values = self.get(section, key).split(',')
+                if len(conf_values) == 1:
+                    # make sure only the value specified by user
+                    # will be deleted if in the key is other value
+                    # than expected, ignore it
+                    if conf_values[0] in args.remove[key_path]:
+                        self.remove_option(section, key)
+                else:
+                    # section.key contains list of values
+                    # exclude all unwanted values from the list
+                    to_remove = args.remove[key_path]
+                    conf_values = list(set(conf_values) - set(to_remove))
+                    self.set(section, key, ",".join(conf_values))
+            except ConfigParser.NoOptionError:
+                # only inform the user, option specified by him doesn't exist
+                LOG.error(sys.exc_info()[1])
+            except ConfigParser.NoSectionError:
+                # only inform the user, section specified by him doesn't exist
+                LOG.error(sys.exc_info()[1])
 
 
 def create_tempest_users(tenants_client, roles_client, users_client, conf,

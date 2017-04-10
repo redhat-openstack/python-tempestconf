@@ -1,0 +1,22 @@
+---
+prelude: >
+    Add a new ability to remove configuration values from tempest.conf
+features:
+  - |
+    Add a new parameter --remove to specify which configuration values should
+    not be included in tempest configuration file.
+    Parameter format:
+     --remove [section.key value [value [...]] section.key value [...] ...]
+    Usage example:
+    $ discover-tempest-config --debug \
+       identity.uri http://192.168.1.108:5000/v3 \
+       identity.admin_password d032668de4ab4fab --create \
+       --remove identity.username demo \ network-feature-enabled.api_extensions
+       router,project-id,dvr
+
+    In that example, option username in section identity will be removed and
+    from api_extensions in section network-feature-enabled will be removed only
+    values "router,project-id,dvr", the other values will remain.
+
+    If a section or an option specified in CLI doesn't exist, tempestconf will
+    inform a user about that in logging.
