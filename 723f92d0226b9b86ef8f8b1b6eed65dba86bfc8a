@@ -1,0 +1,8 @@
+Code-Review+2: Luigi Toscano <ltoscano@redhat.com>
+Verified+1: <mkopec+jenkins@redhat.com>
+Code-Review+2: Chandan Kumar <chkumar@redhat.com>
+Submitted-by: Chandan Kumar <chkumar@redhat.com>
+Submitted-at: Wed, 12 Apr 2017 05:24:57 -0400
+Reviewed-on: https://review.gerrithub.io/346024
+Project: redhat-openstack/python-tempestconf
+Branch: refs/heads/master
