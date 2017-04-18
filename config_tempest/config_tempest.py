@@ -840,9 +840,7 @@ def configure_keystone_feature_flags(conf, services):
             conf.set('identity-feature-enabled',
                      'forbid_global_implied_dsr',
                      'True')
-            conf.set('identity-feature-enabled',
-                     'security_compliance',
-                     'True')
+            # TODO(rodrigods): set the "security_compliance" flag to true
 
 
 def configure_boto(conf, services):
