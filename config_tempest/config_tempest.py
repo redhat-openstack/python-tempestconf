@@ -120,7 +120,8 @@ def main():
 
     conf = TempestConf()
     if os.path.isfile(DEFAULTS_FILE):
-        LOG.info("Reading defaults from file '%s'", DEFAULTS_FILE)
+        LOG.info("Reading values that would override the defaults"
+                 " from file '%s'", DEFAULTS_FILE)
         conf.read(DEFAULTS_FILE)
     if args.deployer_input and os.path.isfile(args.deployer_input):
         LOG.info("Adding options from deployer-input file '%s'",
