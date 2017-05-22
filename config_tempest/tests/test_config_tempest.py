@@ -161,26 +161,45 @@ class TestOsClientConfigSupport(BaseConfigTempestTest):
         func2mock = 'config_tempest.config_tempest.identity.get_tenant_by_name'
         self.useFixture(MonkeyPatch(func2mock, mock_function))
 
-    @mock.patch('os_client_config.cloud_config.CloudConfig')
-    def test_init_manager_client_config(self, mock_args):
+    def _obtain_client_config_data(self, mock_args, admin):
         cloud_args = {
             'username': 'cloud_user',
             'password': 'cloud_pass',
-            'project_name': 'cloud_project'
+            'project_name': 'cloud_project',
+            'auth_url': 'http://auth.url.com/'
         }
         mock_function = mock.Mock(return_value=cloud_args)
         func2mock = 'os_client_config.cloud_config.CloudConfig.config.get'
         self.useFixture(MonkeyPatch(func2mock, mock_function))
-        # remove options, pretend like they aren't set in CLI
-        self.conf.remove_option('identity', 'username')
-        self.conf.remove_option('identity', 'password')
-        self.conf.remove_option('identity', 'tenant_name')
-        manager = tool.ClientManager(self.conf, admin=False, args=mock_args)
-        # check if cloud_args credentials were used
-        self._check_credentials(manager,
-                                cloud_args['username'],
-                                cloud_args['password'],
-                                cloud_args['project_name'])
+        # create an empty conf
+        conf = tool.TempestConf()
+        conf.set('identity', 'uri', cloud_args['auth_url'], priority=True)
+        # call the function and check if data were obtained properly
+        tool.setCloudConfigValues(conf, mock_args)
+        if admin:
+            self.assertEqual(cloud_args['username'],
+                             conf.get('identity', 'admin_username'))
+            self.assertEqual(cloud_args['password'],
+                             conf.get('identity', 'admin_password'))
+            self.assertEqual(cloud_args['project_name'],
+                             conf.get('identity', 'admin_tenant_name'))
+        else:
+            self.assertEqual(cloud_args['username'],
+                             conf.get('identity', 'username'))
+            self.assertEqual(cloud_args['password'],
+                             conf.get('identity', 'password'))
+            self.assertEqual(cloud_args['project_name'],
+                             conf.get('identity', 'tenant_name'))
+
+    @mock.patch('os_client_config.cloud_config.CloudConfig',
+                **{'non_admin': True})
+    def test_init_manager_client_config(self, mock_args):
+        self._obtain_client_config_data(mock_args, False)
+
+    @mock.patch('os_client_config.cloud_config.CloudConfig',
+                **{'non_admin': False})
+    def test_init_manager_client_config_as_admin(self, mock_args):
+        self._obtain_client_config_data(mock_args, True)
 
     @mock.patch('os_client_config.cloud_config.CloudConfig')
     def test_init_manager_client_config_get_default(self, mock_args):

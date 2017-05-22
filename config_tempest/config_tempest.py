@@ -131,13 +131,12 @@ def main():
             # There are no deployer input options in DEFAULT
             for (key, value) in deployer_input.items(section):
                 conf.set(section, key, value, priority=True)
+    # get and set auth data from client's config (os-client-config support)
+    setCloudConfigValues(conf, args)
+    # set overrides - vales specified in CLI
     for section, key, value in args.overrides:
         conf.set(section, key, value, priority=True)
-    if conf.has_option("identity", "uri"):
-        uri = conf.get("identity", "uri")
-    else:
-        uri = args.config['auth'].get('auth_url')
-        conf.set("identity", "uri", uri)
+    uri = conf.get("identity", "uri")
     api_version = 2
     v3_only = False
     if "v3" in uri and v3_only:
@@ -311,6 +310,38 @@ def parse_overrides(overrides):
     return new_overrides
 
 
+def setCloudConfigValues(conf, args):
+    """Set values from client's cloud config file.
+
+    If the cloud config files was provided, set admin and non-admin credentials
+    and uri.
+    Note: the values may be later overriden by values specified in CLI.
+
+    :conf TempestConf object
+    :args parsed arguments including client config values
+    """
+    cloud_creds = args.config.get('auth')
+    if cloud_creds:
+        try:
+            if args.non_admin:
+                conf.set('identity', 'username', cloud_creds['username'])
+                conf.set('identity',
+                         'tenant_name',
+                         cloud_creds['project_name'])
+                conf.set('identity', 'password', cloud_creds['password'])
+            else:
+                conf.set('identity', 'admin_username', cloud_creds['username'])
+                conf.set('identity',
+                         'admin_tenant_name',
+                         cloud_creds['project_name'])
+                conf.set('identity', 'admin_password', cloud_creds['password'])
+            conf.set('identity', 'uri', cloud_creds['auth_url'])
+
+        except cfg.NoSuchOptError:
+            LOG.warning(
+                'Could not load some identity options from cloud config file')
+
+
 class ClientManager(object):
     """Manager of various OpenStack API clients.
 
@@ -368,11 +399,6 @@ class ClientManager(object):
         username = None
         password = None
         tenant_name = None
-        os_client_creds = args.config.get('auth')
-        if os_client_creds:
-            username = os_client_creds.get('username')
-            password = os_client_creds.get('password')
-            tenant_name = os_client_creds.get('project_name')
         if admin:
             try:
                 username = conf.get_defaulted('auth', 'admin_username')
@@ -395,13 +421,9 @@ class ClientManager(object):
                     DEFAULTS_FILE)
         else:
             try:
-                # override values only when were set in CLI
-                if conf.has_option('identity', 'username'):
-                    username = conf.get_defaulted('identity', 'username')
-                if conf.has_option('identity', 'password'):
-                    password = conf.get_defaulted('identity', 'password')
-                if conf.has_option('identity', 'tenant_name'):
-                    tenant_name = conf.get_defaulted('identity', 'tenant_name')
+                username = conf.get_defaulted('identity', 'username')
+                password = conf.get_defaulted('identity', 'password')
+                tenant_name = conf.get_defaulted('identity', 'tenant_name')
 
             except cfg.NoSuchOptError:
                 LOG.warning(
@@ -429,7 +451,6 @@ class ClientManager(object):
             _creds = self.get_credentials(
                 conf, username, tenant_name, password,
                 identity_version=self.identity_version)
-
         _auth = self.get_auth_provider(conf, _creds)
         self.auth_provider = _auth
 
