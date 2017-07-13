@@ -62,6 +62,7 @@ from tempest.lib.services.identity.v3  \
     import identity_client as identity_v3_client
 from tempest.lib.services.image.v2 import images_client
 from tempest.lib.services.network import networks_client
+from tempest.lib.services.volume.v2 import services_client
 
 LOG = logging.getLogger(__name__)
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -195,6 +196,7 @@ def main():
     LOG.debug("Is neutron present: {0}".format(has_neutron))
     create_tempest_networks(clients, conf, has_neutron, args.network_id)
 
+    check_volume_backup_service(clients.volume_service, conf, services)
     configure_discovered_services(conf, services)
     configure_boto(conf, services)
     configure_keystone_feature_flags(conf, services)
@@ -496,12 +498,20 @@ class ClientManager(object):
             conf.get_defaulted('image', 'catalog_type'),
             self.identity_region,
             **default_params)
+
         self.servers = servers_client.ServersClient(_auth,
                                                     **compute_params)
         self.flavors = flavors_client.FlavorsClient(_auth,
                                                     **compute_params)
 
         self.networks = None
+
+        self.volume_service = services_client.ServicesClient(
+            _auth,
+            conf.get_defaulted('volume', 'catalog_type'),
+            self.identity_region,
+            endpoint_type='adminURL',
+            **default_params)
 
         def create_nova_network_client():
             if self.networks is None:
@@ -794,6 +804,17 @@ def create_tempest_images(client, conf, image_path, allow_creation,
     conf.set('compute', 'image_ref_alt', alt_image_id)
 
 
+def check_volume_backup_service(client, conf, services):
+    params = {'binary': 'cinder-backup'}
+    backup_service = client.list_services(**params)
+    if backup_service:
+        # We only set backup to false if the service isn't running otherwise we
+        # keep the default value
+        services = backup_service['services']
+        if not services or services[0]['state'] == 'down':
+            conf.set('volume-feature-enabled', 'backup', 'False')
+
+
 def find_or_upload_image(client, image_id, image_name, allow_creation,
                          image_source='', image_dest='', disk_format=''):
     image = _find_image(client, image_id, image_name)
@@ -923,11 +944,13 @@ def configure_discovered_services(conf, services):
     :param services: dictionary of discovered services - expects each service
         to have a dictionary containing 'extensions' and 'versions' keys
     """
+
     # check if volume service is disabled
     if conf.has_section('services') and conf.has_option('services', 'volume'):
         if not conf.getboolean('services', 'volume'):
             SERVICE_NAMES.pop('volume')
             SERVICE_VERSIONS.pop('volume')
+
     # set service availability
     for service, codename in SERVICE_NAMES.iteritems():
         # ceilometer is still transitioning from metering to telemetry
