@@ -99,7 +99,7 @@ SERVICE_NAMES = {
 SERVICE_VERSIONS = {
     'image': ['v1', 'v2'],
     'identity': ['v2', 'v3'],
-    'volume': ['v1', 'v2']
+    'volume': ['v2', 'v3']
 }
 
 # Keep track of where the extensions are saved for that service.
