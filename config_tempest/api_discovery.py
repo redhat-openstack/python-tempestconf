@@ -29,6 +29,10 @@ class ServiceError(Exception):
     pass
 
 
+class NotFound(ServiceError):
+    pass
+
+
 class Service(object):
     def __init__(self, name, service_url, token, disable_ssl_validation):
         self.name = name
@@ -56,6 +60,9 @@ class Service(object):
             LOG.error("Request on service '%s' with url '%s' failed",
                       (self.name, url))
             raise e
+        if r.status >= 404:
+            raise NotFound or("Request on service '%s' with url '%s' failed"
+                              " with code %d" % (self.name, url, r.status))
         if r.status >= 400:
             raise ServiceError("Request on service '%s' with url '%s' failed"
                                " with code %d" % (self.name, url, r.status))
@@ -98,7 +105,10 @@ class NetworkService(VersionedService):
 
 class VolumeService(VersionedService):
     def get_extensions(self):
-        body = self.do_get(self.service_url + '/extensions')
+        try:
+            body = self.do_get(self.service_url + '/extensions')
+        except NotFound:
+            return []
         body = json.loads(body)
         return map(lambda x: x['alias'], body['extensions'])
 
