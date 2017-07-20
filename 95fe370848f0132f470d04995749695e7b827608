@@ -1,0 +1,7 @@
+Code-Review+2: Arx Cruz <arxcruz@redhat.com>
+Verified+1: Chandan Kumar <chkumar@redhat.com>
+Submitted-by: Chandan Kumar <chkumar@redhat.com>
+Submitted-at: Thu, 20 Jul 2017 05:02:02 -0400
+Reviewed-on: https://review.gerrithub.io/370454
+Project: redhat-openstack/python-tempestconf
+Branch: refs/heads/master
