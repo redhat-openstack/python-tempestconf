@@ -87,7 +87,7 @@ SERVICE_NAMES = {
     'object-store': 'swift',
     'orchestration': 'heat',
     'share': 'manila',
-    'telemetry': 'ceilometer',
+    'metering': 'ceilometer',
     'volume': 'cinder',
     'messaging': 'zaqar',
 }
@@ -951,9 +951,6 @@ def configure_discovered_services(conf, services):
             SERVICE_VERSIONS.pop('volume')
     # set service availability
     for service, codename in SERVICE_NAMES.iteritems():
-        # ceilometer is still transitioning from metering to telemetry
-        if service == 'telemetry' and 'metering' in services:
-            service = 'metering'
         conf.set('service_available', codename, str(service in services))
 
     # set supported API versions for services with more of them
