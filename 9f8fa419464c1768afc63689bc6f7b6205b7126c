@@ -1,0 +1,8 @@
+Verified+1: <mkopec+jenkins@redhat.com>
+Code-Review+2: Martin Kopec <mkopec@redhat.com>
+Code-Review+2: Luigi Toscano <ltoscano@redhat.com>
+Submitted-by: Luigi Toscano <ltoscano@redhat.com>
+Submitted-at: Tue, 15 Aug 2017 09:57:25 -0400
+Reviewed-on: https://review.gerrithub.io/370449
+Project: redhat-openstack/python-tempestconf
+Branch: refs/heads/master
