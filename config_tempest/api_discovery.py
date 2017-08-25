@@ -37,11 +37,47 @@ class Service(object):
         self.disable_ssl_validation = disable_ssl_validation
 
     def do_get(self, url, top_level=False, top_level_path=""):
-        parts = list(urlparse.urlparse(url))
-        # 2 is the path offset
-        if top_level:
-            parts[2] = '/' + top_level_path
+        u = urllib3.util.parse_url(url)
 
+        # NOTE: endpoint URL has at least 3 formats:
+        #   1. The classic (legacy) endpoint:
+        #       http://{host}:{port}/v{1 or 2 or 3}/{project-id}
+        #       http://{host}:{port}/v{1 or 2 or 3}
+        #   2. The same as 1. but port is optional
+        #   3. Under wsgi:
+        #       http://{host}:{optional_port}/volume/v{1 or 2 or 3}
+        url = None
+        try:
+            # check if url contains a version
+            for ver in ['v1', 'v2', 'v3']:
+                # if it's top level url crop it
+                if ("/{0}".format(ver) in u.path) and top_level:
+                    # path is the path of url starting with version
+                    path = u.path[:u.path.rfind(ver)]
+                    # if top_level_path was defined, use it
+                    # otherwise use existing path
+                    if len(top_level_path) > 0:
+                        path = "/" + top_level_path
+                    url = '%s://%s%s' % (u.scheme, u.netloc, path)
+                    break
+        except TypeError:
+            # url contains no path (u is None), use top level one
+            #  * http://{host}:{optional_port}
+            path = "/" + top_level_path
+            url = '%s://%s%s' % (u.scheme, u.netloc, path)
+
+        if not url:
+            # NOTE:
+            #  * url contains a path, but top_level is False
+            #  * url contains a path (at least "/") without version
+            # EXAMPLE: probably, it is one of the next cases:
+            #  * https://example.com:{optional_port}/compute/v2.1
+            #  * https://volume.example.com:{optional_port}/
+            # leave as is without cropping
+            url = str(u)
+
+        # remove occurrence of double "/" that may have occurred
+        parts = list(urlparse.urlparse(url))
         parts[2] = MULTIPLE_SLASH.sub('/', parts[2])
         url = urlparse.urlunparse(parts)
 
@@ -105,6 +141,10 @@ class VolumeService(VersionedService):
 
 class IdentityService(VersionedService):
     def get_extensions(self):
+        # NOTE(mkopec): temporary hack, when --v3-only is used, all clients
+        # use their v3 version except identity client - it still uses v2.0,
+        # even in devstack environment
+        self.service_url = self.service_url.replace("v3", "")
         if 'v2.0' in self.service_url:
             body = self.do_get(self.service_url + '/extensions')
         else:
@@ -177,11 +217,14 @@ def discover(auth_provider, region, object_store_discovery=True,
     service_catalog = 'serviceCatalog'
     public_url = 'publicURL'
     identity_port = urlparse.urlparse(auth_provider.auth_url).port
+    if identity_port is None:
+        identity_port = ""
+    else:
+        identity_port = ":" + str(identity_port)
     identity_version = urlparse.urlparse(auth_provider.auth_url).path
     if api_version == 3:
         service_catalog = 'catalog'
         public_url = 'url'
-
     for entry in auth_data[service_catalog]:
         name = entry['type']
         services[name] = dict()
@@ -193,7 +236,7 @@ def discover(auth_provider, region, object_store_discovery=True,
             ep = entry['endpoints'][0]
         if 'identity' in ep[public_url]:
             services[name]['url'] = ep[public_url].replace(
-                "/identity", ":{0}{1}".format(
+                "/identity", "{0}{1}".format(
                     identity_port, identity_version))
         else:
             services[name]['url'] = ep[public_url]
@@ -202,7 +245,7 @@ def discover(auth_provider, region, object_store_discovery=True,
                                 disable_ssl_certificate_validation)
         if name == 'object-store' and not object_store_discovery:
             services[name]['extensions'] = []
-        elif 'v3' not in ep['publicURL']:  # is not v3 url
+        elif 'v3' not in ep[public_url]:  # is not v3 url
             services[name]['extensions'] = service.get_extensions()
         services[name]['versions'] = service.get_versions()
     return services
