@@ -47,7 +47,8 @@ class TestCreateTempestUser(BaseConfigTempestTest):
                                   self.roles_client,
                                   self.users_client,
                                   self.conf,
-                                  services=services)
+                                  services=services,
+                                  api_version=2)
         if 'orchestration' in services:
             self.assertEqual(mock_give_role_to_user.mock_calls, [
                 mock.call(self.tenants_client,
@@ -80,12 +81,14 @@ class TestCreateTempestUser(BaseConfigTempestTest):
                       self.users_client,
                       self.conf.get('identity', 'username'),
                       self.conf.get('identity', 'password'),
-                      self.conf.get('identity', 'tenant_name')),
+                      self.conf.get('identity', 'tenant_name'),
+                      api_version=2),
             mock.call(self.tenants_client,
                       self.users_client,
                       self.conf.get('identity', 'alt_username'),
                       self.conf.get('identity', 'alt_password'),
-                      self.conf.get('identity', 'alt_tenant_name')),
+                      self.conf.get('identity', 'alt_tenant_name'),
+                      api_version=2),
         ])
 
     def test_create_tempest_user(self):
