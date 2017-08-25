@@ -190,8 +190,6 @@ class TestCreateUserWithTenant(BaseConfigTempestTest):
                                             password=self.password,
                                             tenantId="fake-id",
                                             email=self.email)
-        mock_update_user_password.assert_called_with(
-            fake_user['id'], password=self.password)
 
     @mock.patch('tempest.lib.services.identity.v2.'
                 'users_client.UsersClient.update_user_password')
@@ -223,8 +221,6 @@ class TestCreateUserWithTenant(BaseConfigTempestTest):
                                             password=self.password,
                                             tenantId="fake-id",
                                             email=self.email)
-        mock_update_user_password.assert_called_with(
-            fake_user['id'], password=self.password)
 
 
 class TestGiveRoleToUser(BaseConfigTempestTest):
