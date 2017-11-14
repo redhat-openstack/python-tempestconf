@@ -1,6 +1,6 @@
-# UUID            	Group Name
+# UUID                                  	Group Name
 #
 635704e5de8c5b342d552ef507046be5b79c6d43	rhos-tempest-core
 f3ecf61dbf829bba93bb94096fa20ed29f0768aa	rdo-ci-group
 global:Registered-Users                 	Registered Users
-user:danielmellado	user/Daniel Mellado (danielmellado)
+user:danielmellado                      	user/Daniel Mellado (danielmellado)
