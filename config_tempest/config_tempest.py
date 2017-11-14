@@ -205,6 +205,8 @@ def main():
     configure_boto(conf, services)
     configure_keystone_feature_flags(conf, services)
     configure_horizon(conf)
+    if "ec2" in services:
+        configure_ec2api(conf, clients.users)
 
     # remove all unwanted values if were specified
     if args.remove != {}:
@@ -1000,6 +1002,26 @@ def configure_horizon(conf):
     conf.set('service_available', 'horizon', str(has_horizon))
     conf.set('dashboard', 'dashboard_url', base + '/')
     conf.set('dashboard', 'login_url', base + '/auth/login/')
+
+
+def configure_ec2api(conf, clients):
+    """Create ec2 credentials and set configs."""
+    username = conf.get('identity', 'username')
+    tenant_name = conf.get('identity', 'tenant_name')
+    users = clients.users.list_users()
+    user_ids = [u['id'] for u in users['users'] if u['name'] == username]
+    user_id = user_ids[0]
+    tenant_id = clients.tenants.get_project_by_name(tenant_name)['id']
+    resp = users_client.create_user_ec2_credential(
+        user_id, tenant_id=tenant_id)['credential']
+    access = resp['access']
+    secret = resp['secret']
+    conf.set('aws', 'aws_access', access)
+    conf.set('aws', 'aws_secret', secret)
+    flavor_ref = conf.get('compute', 'flavor_ref')
+    flavor_ref_alt = conf.get('compute', 'flavor_ref_alt')
+    conf.set('aws', 'instance_type', flavor_ref)
+    conf.set('aws', 'instance_type_alt', flavor_ref_alt)
 
 
 def configure_discovered_services(conf, services):
