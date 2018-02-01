@@ -1,4 +1,0 @@
----
-features:
-  - Added network.remove-extension <extension names followed by comma> to remove
-    neutron api extensions.
