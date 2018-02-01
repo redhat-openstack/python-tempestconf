@@ -1,6 +1,0 @@
-[run]
-branch = True
-source = config_tempest
-
-[report]
-ignore_errors = True
